@@ -4,7 +4,7 @@ Code for my collection of predictors/classifiers/etc
 
 ## CityAesthetics - Anime
 
-IMAGE [logo.png]
+![Logo](https://github.com/city96/CityClassifiers/assets/125218114/0413003a-851d-42fc-b795-eae525b7b2e5)
 
 [Live Demo](https://huggingface.co/spaces/city96/CityAesthetics-demo) | [Model download](https://huggingface.co/city96/CityAesthetics)
 
@@ -45,15 +45,15 @@ The main usecase will be to provide baseline filtering on large datasets (i.e. a
 
 The \>60% score range is intended to help pick out the "best" images from a dataset. One could use it to filter by score (i.e. using it as a band pass filter), but the scores above 50% are a lot more vague. Instead, I'd recommend sorting the dataset by score instead and setting a limit on the total number of images to select.
 
-Top 100 images from a subset of danbooru2021:
+Top 100 images from a subset of danbooru2021 using the v1.7 model:
 
-IMAGE [AesPredv17_T100.jpg]
+![AesPredv17_T100C](https://github.com/city96/CityClassifiers/assets/125218114/b7d8a167-a53a-46bb-8737-6c6c2a04f50f)
 
 ### Training
 
 The training script provided is initialized with the current model settings as the defaults (7e-6 LR, cosine scheduler, 100K steps).
 
-IMAGE [loss.png]
+![loss](https://github.com/city96/CityClassifiers/assets/125218114/611ae144-1390-48d3-988d-59a03c4a2f26)
 
 Final dataset score distribution for v1.8:
 ```
