@@ -1,3 +1,23 @@
+data/
+test/
+pass/
+fail/
+other/
+images/
+ratings/
+models/
+external/
+preprocess_*
+
+*.png
+*.zip
+*.npy
+*.pth
+*.ckpt
+*.safetensors
+
+# default github .gitignore follows
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
