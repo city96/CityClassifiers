@@ -4,7 +4,7 @@ pass/
 fail/
 other/
 images/
-ratings/
+ratings*
 models/
 external/
 preprocess_*

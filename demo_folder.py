@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 from shutil import copyfile
 
-from inference import CityAestheticsPipeline
+from inference import CityAestheticsPipeline, CityClassifierPipeline
 
 IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
 
@@ -16,14 +16,18 @@ def parse_args():
 	parser.add_argument('--max', type=int, default=100, help="Upper limit for score")
 	parser.add_argument('--min', type=int, default=  0, help="Lower limit for score")
 	parser.add_argument('--model', required=True, help="Model file to use")
-	parser.add_argument("--arch", choices=["Aesthetic"], default="Aesthetic", help="Model type")
+	parser.add_argument("--arch", choices=["score", "class"], default="score", help="Model type")
+	parser.add_argument('--label', type=int, default=0, help="Target class to use when model type is classifier")
 	parser.add_argument('--copy', action=argparse.BooleanOptionalAction, help="Copy files to the dst folder")
 	parser.add_argument('--keep', action=argparse.BooleanOptionalAction, help="Keep original folder structure")
 	return parser.parse_args()
 
 def process_file(pipeline, src_path, dst_path):
 	pred = pipeline(Image.open(src_path))
-	pred = int(pred * 100) # [float]=>[int](percentage)
+	if args.arch == "score":
+		pred = int(pred * 100) # [float]=>[int](percentage)
+	elif args.arch == "class":
+		pred = int(pred.get(str(args.label)) * 100)
 
 	tqdm.write(f" {pred:>3}% [{os.path.basename(src_path)}]")
 	if args.min <= pred <= args.max:
@@ -53,14 +57,17 @@ if __name__ == "__main__":
 	args = parse_args()
 
 	os.makedirs(args.dst, exist_ok=True)
-	print(f"Aesthetic Predictor using model {os.path.basename(args.model)}")
+	print(f"Predictor using model {os.path.basename(args.model)}")
 
-	if args.arch == "Aesthetic":
-		pipeline_args = {}
-		if torch.cuda.is_available():
-			pipeline_args["device"] = "cuda"
-			pipeline_args["clip_dtype"] = torch.float16
+	pipeline_args = {}
+	if torch.cuda.is_available():
+		pipeline_args["device"] = "cuda"
+		pipeline_args["clip_dtype"] = torch.float16
+
+	if args.arch == "score":
 		pipeline = CityAestheticsPipeline(args.model, **pipeline_args)
+	elif args.arch == "class":
+		pipeline = CityClassifierPipeline(args.model, **pipeline_args)
 	else:
 		raise ValueError(f"Unknown model architecture '{args.arch}'")
 

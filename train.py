@@ -1,41 +1,24 @@
 import os
 import torch
-import argparse
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from safetensors.torch import load_file
 
-from dataset import EmbeddingDataset
-from utils import ModelWrapper, get_embed_params
-from model import AestheticPredictorModel
+from dataset import EmbeddingDataset, ImageDataset
+from utils import ModelWrapper, get_embed_params, parse_args, write_config
+from model import PredictorModel
 
 torch.backends.cudnn.benchmark = True
 torch.manual_seed(0)
 
 TARGET_DEV = "cuda"
 
-def parse_args():
-	parser = argparse.ArgumentParser(description="Train aesthetic predictor")
-	parser.add_argument("-s", "--steps", type=int, default=100000, help="No. of training steps")
-	parser.add_argument("-b", "--batch", type=int, default=1, help="Batch size")
-	parser.add_argument("-n", "--nsave", type=int, default=0, help="Save model/sample periodically")
-	parser.add_argument('--lr', default="7e-6", help="Learning rate")
-	parser.add_argument('--rev', default="Anime-v1.9-rc1", help="Revision/log ID")
-	parser.add_argument("--clip", choices=["CLIP", "META"], default="CLIP", help="Embedding type")
-	parser.add_argument("--arch", choices=["Aesthetic"], default="Aesthetic", help="Model type")
-	parser.add_argument('--resume', help="Checkpoint to resume from")
-	parser.add_argument('--cosine', action=argparse.BooleanOptionalAction, default=True, help="Use cosine scheduler")
-	args = parser.parse_args()
-	try:
-		float(args.lr)
-	except ValueError:
-		parser.error("--lr must be a valid float eg. 0.001 or 1e-3")
-	return args
-
 if __name__ == "__main__":
 	args = parse_args()
 
-	dataset = EmbeddingDataset(args.clip, preload=True)
+	if args.images: dataset = ImageDataset(args.clip, mode=args.arch)
+	else: dataset = EmbeddingDataset(args.clip, mode=args.arch, preload=True)
+
 	loader = DataLoader(
 		dataset,
 		batch_size  = args.batch,
@@ -43,18 +26,28 @@ if __name__ == "__main__":
 		drop_last   = True,
 		pin_memory  = False,
 		num_workers = 0,
-		# num_workers=4,
+		# num_workers=4, # doesn't work w/ --image
 		# persistent_workers=True,
 	)
 
-	if args.arch == "Aesthetic":
-		model = AestheticPredictorModel(**get_embed_params(args.clip))
-		name  = f"CityAesthetics-{args.rev}"
-		#name = f"AesPred-{args.ver}-{args.rev}", # for testing different CLIP versions
+	if args.arch == "score":
+		criterion = torch.nn.L1Loss()
+		model = PredictorModel(
+			outputs = 1,
+			**get_embed_params(args.clip)
+		)
+	elif args.arch == "class":
+		args.num_labels = args.num_labels or dataset.num_labels
+		assert args.num_labels == dataset.num_labels, "Label count mismatch!"
+		weights = torch.tensor(args.weights, device=TARGET_DEV) if args.weights else None
+		criterion = torch.nn.CrossEntropyLoss(weights)
+		model = PredictorModel(
+			outputs = args.num_labels,
+			**get_embed_params(args.clip)
+		)
 	else:
 		raise ValueError(f"Unknown model architecture '{args.arch}'")
 
-	criterion = torch.nn.L1Loss()
 	optimizer = torch.optim.AdamW(model.parameters(), lr=float(args.lr))
 	scheduler = None
 	if args.cosine:
@@ -81,10 +74,11 @@ if __name__ == "__main__":
 	else:
 		model.to(TARGET_DEV)
 
+	write_config(args) # model config file
 	wrapper = ModelWrapper( # model wrapper for saving/eval/etc
-		name      = name,
+		name      = args.name,
 		model     = model,
-		evals     = dataset.get_eval(),
+		evals     = dataset.eval_data,
 		device    = TARGET_DEV,
 		criterion = criterion,
 		optimizer = optimizer,
@@ -95,7 +89,14 @@ if __name__ == "__main__":
 	while progress.n < args.steps:
 		for batch in loader:
 			emb = batch.get("emb").to(TARGET_DEV)
-			val = batch.get("val").to(TARGET_DEV)
+
+			if args.arch == "score":
+				val = batch.get("val").to(TARGET_DEV)
+			elif args.arch == "class":
+				val = torch.zeros(args.num_labels, device=TARGET_DEV)
+				val[batch.get("raw")] = 1.0 # expand classes
+				val = val.unsqueeze(0).repeat(emb.shape[0], 1)
+
 			with torch.cuda.amp.autocast():
 				y_pred = model(emb) # forward
 				loss = criterion(y_pred, val) # loss

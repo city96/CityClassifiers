@@ -2,6 +2,79 @@
 
 Code for my collection of predictors/classifiers/etc
 
+## Architecture
+
+The base model itself is fairly simple. It takes embeddings from a CLIP model (in this case, `openai/clip-vit-large-patch14`) and expands them to 1024 dimensions. From there, a single block with residuals is followed by a few linear layers which converge down to the final output.
+
+For the predictor model, the final output goes through `nn.Tanh`. For the classifier, this is `nn.Softmax` instead.
+
+# Classifiers
+
+[Live Demos](https://huggingface.co/spaces/city96/AnimeClassifiers-demo) | [Model downloads](https://huggingface.co/city96/AnimeClassifiers)
+
+These are models that predict whether a concept is present in an image. The performance on high resolution images isn't very good, especially when detecting subtle image effects such as noise. This is due to CLIP using a fairly low resolution (336x336/224x224).
+
+To combat this, tiling is used at inference time. The input image is first downscaled to 1536 (shortest edge - See `TF.functional.resize`), then 5 separate 512x512 areas are selected (4 corners + center - See `TF.functional.five_crop`). This helps as the downscale factor isn't nearly as drastic as passing the entire image to CLIP. As a bonus, it also avoids the issues with odd aspect ratios requiring cropping or letterboxing to work.
+
+![Tiling](https://github.com/city96/CityClassifiers/assets/125218114/66a30048-93ce-4c00-befc-0d986c84ec9f)
+
+As for the training, it will be detailed in the sections below for the individual classifiers. At first, specialized models will be trained to a relatively high accuracy, building up a high quality but specific dataset in the process.
+
+Then, these models will be used to split/sort each other's the datasets. The code will need to be updated to support one image being part of more than one class, but the final result should be a clean dataset where each target aspect acts as a "tag" rather than a class.
+
+## Future/planned
+
+- Unified (by joining the datasets of the other classifiers)
+- Compression (jpg/webp/gif/dithering/etc)
+- Noise
+
+## ChromaticAberration - Anime
+
+### Design goals
+
+The goal was to detect [chromatic aberration](https://en.wikipedia.org/wiki/Chromatic_aberration?useskin=vector) in images.
+
+For some odd reason, this effect has become a popular post processing effect to apply to images and drawings. While attempting to train an ESRGAN model, I noticed an odd halo around images and quickly figured out that this effect was the cause. This classifier aims to work as a base filter to remove such images from the dataset.
+
+### Issues
+
+- Seems to get confused by excessive HSV noise
+- Triggers even if the effect is only applied to the background
+- Sometimes triggers on rough linework/sketches (i.e. multiple semi-transparent lines overlapping)
+- Low accuracy on 3D/2.5D with possible false positives.
+
+### Training
+
+The training settings can be found in the `config/CCAnime-ChromaticAberration-v1.yaml` file (7e-6 LR, cosine scheduler, 100K steps).
+
+![loss](https://github.com/city96/CityClassifiers/assets/125218114/475f1241-2b4e-4fc9-bbcd-261b85b8b491)
+
+![loss-eval](https://github.com/city96/CityClassifiers/assets/125218114/88d6f090-aa6f-42ad-9fd0-8c5d267fce5e)
+
+
+Final dataset score distribution for v1.16:
+```
+3215 images in dataset.
+0_reg       -  395 ||||
+0_reg_booru - 1805 ||||||||||||||||||||||
+1_chroma    -  515 ||||||
+1_synthetic -  500 ||||||
+
+Class ratios:
+00 - 2200 |||||||||||||||||||||||||||
+01 - 1015 ||||||||||||
+```
+
+Version history:
+
+- v1.0 - Initial test model, dataset is fully synthetic (500 images). Effect added by shifting red/blue channel by a random amount using chaiNNer.
+- v1.1 - Added 300 images tagged "chromatic_aberration" from gelbooru. Added first 1000 images from danbooru2021 as reg images
+- v1.2 - Used the newly trained predictor to filter the existing datasets - found ~70 positives in the reg set and ~30 false positives in the target set.
+- v1.3-v1.16 - Repeatedly ran predictor against various datasets, adding false positives/negatives back into the dataset, sometimes running against the training set to filter out misclassified images as the predictor got better. Added/removed images were manually checked (My eyes hurt).
+
+
+# Predictors
+
 ## CityAesthetics - Anime
 
 ![Logo](https://github.com/city96/CityClassifiers/assets/125218114/0413003a-851d-42fc-b795-eae525b7b2e5)
@@ -51,7 +124,7 @@ Top 100 images from a subset of danbooru2021 using the v1.7 model:
 
 ### Training
 
-The training script provided is initialized with the current model settings as the defaults (7e-6 LR, cosine scheduler, 100K steps).
+The training settings are initialized from the `config/CityAesthetics-v1.yaml` file (7e-6 LR, cosine scheduler, 100K steps).
 
 ![loss](https://github.com/city96/CityClassifiers/assets/125218114/611ae144-1390-48d3-988d-59a03c4a2f26)
 
@@ -79,10 +152,6 @@ Version history:
 - v1.2 - Manually scored ~2500 danbooru images for the main training set
 - v1.3-v1.7 - Repeatedly ran the model against various datasets, adding the false negatives/positives to the training set to try and correct for various edgecases
 - v1.8 - Added 3D and 2.5D images to the negative brackets to filter these as well
-
-### Architecture
-
-The model itself is fairly simple. It takes embeddings from a CLIP model (in this case, `openai/clip-vit-large-patch14`) and expands them to 1024 dimensions. From there, a single block with residuals is followed by a few linear layers which converge down to the final output - a single float between 0.0 and 1.0.
 
 ### Demo
 

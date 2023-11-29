@@ -1,0 +1,23 @@
+model:
+  # Name / revision to save model as
+  base: "CCAnime-ChromaticAberration"
+  rev:  "v1.16"
+  # Model architecture. 'score' or 'class'
+  arch: class
+  # CLIP for openai/clip-vit-large-patch14
+  # META for metaclip_fullcc|ViT-H-14-quickgelu
+  clip: CLIP
+
+train:
+  lr:    1.5e-6   # init. learning rate
+  steps: 30000    # no. of training steps
+  batch: 1        # training batch size
+  cosine: True    # Use cosine scheduler
+
+labels:
+  0:
+    name: "No Effect"
+    loss: 1.0
+  1:
+    name: "Chromatic Aberration"
+    loss: 0.5
