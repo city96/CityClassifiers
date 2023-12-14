@@ -8,6 +8,7 @@ TOKEN  = os.environ.get("HFS_TOKEN")
 HFREPO = "City96/AnimeClassifiers"
 MODELS = [
 	"CCAnime-ChromaticAberration-v1.16",
+	"CCAnime-Compression-v1.5",
 ]
 article = """\
 # About

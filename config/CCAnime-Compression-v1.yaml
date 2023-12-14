@@ -1,15 +1,26 @@
 model:
   # Name / revision to save model as
-  base: "CityAesthetics-Anime"
-  rev:  "v1.8"
+  base: "CCAnime-Compression"
+  rev:  "v1.5"
   # Model architecture. 'score' or 'class'
-  arch: score
+  arch: class
   # CLIP for openai/clip-vit-large-patch14-336
   # META for metaclip_fullcc|ViT-H-14-quickgelu
   clip: CLIP
 
 train:
-  lr:    7e-6     # init. learning rate
-  steps: 100000   # no. of training steps
+  lr:    2.7e-6   # init. learning rate
+  steps: 40000    # no. of training steps
   batch: 1        # training batch size
   cosine: True    # Use cosine scheduler
+
+labels:
+  0:
+    name: "Pass"
+    loss: 1.0
+  1:
+    name: "JPEG"
+    loss: 0.85
+  2:
+    name: "WEBP"
+    loss: 0.65

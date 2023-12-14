@@ -39,7 +39,10 @@ if __name__ == "__main__":
 	elif args.arch == "class":
 		args.num_labels = args.num_labels or dataset.num_labels
 		assert args.num_labels == dataset.num_labels, "Label count mismatch!"
-		weights = torch.tensor(args.weights, device=TARGET_DEV) if args.weights else None
+		weights = None
+		if args.weights:
+			weights = torch.tensor(args.weights, device=TARGET_DEV)
+			print(f"Class weights: '{args.weights}'")
 		criterion = torch.nn.CrossEntropyLoss(weights)
 		model = PredictorModel(
 			outputs = args.num_labels,
@@ -78,8 +81,8 @@ if __name__ == "__main__":
 	wrapper = ModelWrapper( # model wrapper for saving/eval/etc
 		name      = args.name,
 		model     = model,
-		evals     = dataset.eval_data,
 		device    = TARGET_DEV,
+		dataset   = dataset,
 		criterion = criterion,
 		optimizer = optimizer,
 		scheduler = scheduler,
@@ -110,10 +113,12 @@ if __name__ == "__main__":
 			# eval/save
 			progress.update(args.batch)
 			wrapper.log_step(loss.data.item(), progress.n)
+			wrapper.log_point(loss.data.item(), batch.get("index"))
 			if args.nsave > 0 and progress.n % (args.nsave + args.nsave%args.batch) == 0:
 				wrapper.save_model(step=progress.n)
 			if progress.n >= args.steps:
 				break
 	progress.close()
 	wrapper.save_model(epoch="") # final save
+	wrapper.enum_point() # outliers
 	wrapper.close()

@@ -24,6 +24,7 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
+from copy import deepcopy
 from torch.utils.data import Dataset
 
 DEFAULT_ROOT = "data"
@@ -44,7 +45,7 @@ class Shard:
 		return os.path.isfile(self.path) and self.value is not None
 
 	def get_data(self):
-		if self.data is not None: return self.data
+		if self.data is not None: return deepcopy(self.data)
 		data = torch.from_numpy(
 			np.load(self.path)
 		)
@@ -98,7 +99,9 @@ class EmbeddingDataset(Dataset):
 		return len(self.shards)
 
 	def __getitem__(self, index):
-		return self.load_shard(self.shards[index])
+		data = self.load_shard(self.shards[index])
+		data["index"] = index
+		return data
 
 	def load_shard(self, shard):
 		return shard.get_data()
@@ -162,7 +165,7 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 IMAGE_ROOT = "ratings"
-IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
+IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
 
 class ImageShard(Shard):
 	"""
@@ -171,7 +174,7 @@ class ImageShard(Shard):
 		value: score for the original image
 	"""
 	def get_data(self):
-		if self.data is not None: return self.data
+		if self.data is not None: return deepcopy(self.data)
 		return {
 			"img": Image.open(self.path).convert("RGB"),
 			"raw": self.value,
@@ -179,7 +182,7 @@ class ImageShard(Shard):
 		}
 
 class ImageDataset(EmbeddingDataset):
-	def __init__(self, ver, root=IMAGE_ROOT, mode="class", size=512, clip_dtype=torch.float16):
+	def __init__(self, ver, root=IMAGE_ROOT, mode="class", clip_dtype=torch.float16, preload=False):
 		"""
 		Secondary dataset that returns list of requested images as (C, E) embeddings
 		  ver: CLIP version 
@@ -188,17 +191,18 @@ class ImageDataset(EmbeddingDataset):
 		"""
 		self.ver = ver
 		self.root = root
-		self.size = size
 		self.mode = mode
 
 		self.device = "cuda"
-		self.clip_ver = "openai/clip-vit-large-patch14"
+		self.clip_ver = "openai/clip-vit-large-patch14-336"
 		self.clip_dtype = clip_dtype
 		self.shard_class = ImageShard
-		self.tf = TF.RandomCrop(self.size)
 
 		assert self.ver in ["CLIP"], "Dataset: META Clip not supported for live encoding!"
 		self.proc, self.clip = self.init_clip()
+
+		self.tfs = self.proc.size.get("shortest_edge", 256)*2
+		self.tf = TF.RandomCrop(self.tfs)
 
 		if self.mode == "score":
 			self.parse_shards(
@@ -216,11 +220,14 @@ class ImageDataset(EmbeddingDataset):
 		else:
 			raise NotImplementedError("Unknown mode")
 
+		[x.preload() for x in tqdm(self.shards)]
 		print(f"Dataset: OK, {len(self)} items")
 
 	def load_shard(self, shard):
 		data = shard.get_data()
-		img = self.tf(data.pop("img")) # apply transforms
+		img = data.pop("img")
+		if min(img.size) >= self.tfs:
+			img = self.tf(img) # apply transforms
 		data["emb"] = self.get_clip_emb(img).squeeze(0)
 		return data
 

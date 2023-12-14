@@ -4,7 +4,7 @@ Code for my collection of predictors/classifiers/etc
 
 ## Architecture
 
-The base model itself is fairly simple. It takes embeddings from a CLIP model (in this case, `openai/clip-vit-large-patch14`) and expands them to 1024 dimensions. From there, a single block with residuals is followed by a few linear layers which converge down to the final output.
+The base model itself is fairly simple. It takes embeddings from a CLIP model (in this case, `openai/clip-vit-large-patch14-336`) and expands them to 1024 dimensions. From there, a single block with residuals is followed by a few linear layers which converge down to the final output.
 
 For the predictor model, the final output goes through `nn.Tanh`. For the classifier, this is `nn.Softmax` instead.
 
@@ -14,7 +14,7 @@ For the predictor model, the final output goes through `nn.Tanh`. For the classi
 
 These are models that predict whether a concept is present in an image. The performance on high resolution images isn't very good, especially when detecting subtle image effects such as noise. This is due to CLIP using a fairly low resolution (336x336/224x224).
 
-To combat this, tiling is used at inference time. The input image is first downscaled to 1536 (shortest edge - See `TF.functional.resize`), then 5 separate 512x512 areas are selected (4 corners + center - See `TF.functional.five_crop`). This helps as the downscale factor isn't nearly as drastic as passing the entire image to CLIP. As a bonus, it also avoids the issues with odd aspect ratios requiring cropping or letterboxing to work.
+To combat this, tiling is used at inference time. The input image is first downscaled to 1536 (shortest edge - See `TF.functional.resize`), then 5 separate areas are selected (double the res of the CLIP preprocessor. 4 corners + center - See `TF.functional.five_crop`). This helps as the downscale factor isn't nearly as drastic as passing the entire image to CLIP. As a bonus, it also avoids the issues with odd aspect ratios requiring cropping or letterboxing to work.
 
 ![Tiling](https://github.com/city96/CityClassifiers/assets/125218114/66a30048-93ce-4c00-befc-0d986c84ec9f)
 

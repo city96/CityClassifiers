@@ -17,7 +17,7 @@ def parse_args():
 	parser.add_argument('--min', type=int, default=  0, help="Lower limit for score")
 	parser.add_argument('--model', required=True, help="Model file to use")
 	parser.add_argument("--arch", choices=["score", "class"], default="score", help="Model type")
-	parser.add_argument('--label', type=int, default=0, help="Target class to use when model type is classifier")
+	parser.add_argument('--label', type=str, default=0, help="Target class to use when model type is classifier. Comma separated.")
 	parser.add_argument('--copy', action=argparse.BooleanOptionalAction, help="Copy files to the dst folder")
 	parser.add_argument('--keep', action=argparse.BooleanOptionalAction, help="Keep original folder structure")
 	return parser.parse_args()
@@ -27,7 +27,7 @@ def process_file(pipeline, src_path, dst_path):
 	if args.arch == "score":
 		pred = int(pred * 100) # [float]=>[int](percentage)
 	elif args.arch == "class":
-		pred = int(pred.get(str(args.label)) * 100)
+		pred = max([int(pred.get(str(x).strip()) * 100) for x in args.label.split(',')])
 
 	tqdm.write(f" {pred:>3}% [{os.path.basename(src_path)}]")
 	if args.min <= pred <= args.max:

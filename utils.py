@@ -13,7 +13,7 @@ SAVE_FOLDER = "models"
 def get_embed_params(ver):
 	if ver == "CLIP":
 		# CLIPVisionModelWithProjection
-		#  openai/clip-vit-large-patch14
+		#  openai/clip-vit-large-patch14-336
 		return {
 			"features" :  768,
 			"hidden"   : 1024,
@@ -88,18 +88,20 @@ def write_config(args):
 		f.write(json.dumps(conf, indent=2))
 
 class ModelWrapper:
-	def __init__(self, name, model, optimizer, criterion, scheduler, device="cpu", evals=[None,None], stdout=True):
+	def __init__(self, name, model, optimizer, criterion, scheduler, device="cpu", dataset=None, stdout=True):
 		self.name   = name
+		self.device = device
 		self.losses = []
+		self.ptloss = [[] for x in range(len(dataset))]
 
 		self.model = model
 		self.optimizer = optimizer
 		self.criterion = criterion
 		self.scheduler = scheduler
 
-		self.device = device
-		self.eval_src = evals.get("emb")
-		self.eval_dst = evals.get("val")
+		self.dataset  = dataset
+		self.eval_src = dataset.eval_data.get("emb")
+		self.eval_dst = dataset.eval_data.get("val")
 
 		os.makedirs(SAVE_FOLDER, exist_ok=True)
 		self.csvlog = open(f"{SAVE_FOLDER}/{self.name}.csv", "w")
@@ -125,14 +127,23 @@ class ModelWrapper:
 			self.csvlog.write(f"{step},{avg},{evl},{lr}\n")
 			self.csvlog.flush()
 
+	def log_point(self, loss, index):
+		for i in index:
+			self.ptloss[int(i)].append(loss)
+
+	def enum_point(self):
+		data = [sum(x[-LOSS_MEMORY*4:])/LOSS_MEMORY*4 for x in self.ptloss]
+		sort = sorted(data, reverse=True)
+		tqdm.write("\nOutliers:")
+		for i in range(15):
+			idx = data.index(sort[i])
+			tqdm.write(f"#{i:<2} | {sort[i]:.4e} | [{self.dataset.shards[idx].path}]")
+
 	def eval_model(self):
 		with torch.cuda.amp.autocast():
 			with torch.no_grad():
 				pred = self.model(self.eval_src.to(self.device))
-				# tqdm.write(str(self.eval_dst))
-				# tqdm.write(str(pred))
 				loss = self.criterion(pred, self.eval_dst.to(self.device))
-				# tqdm.write(str(loss))
 		return loss, pred
 
 	def save_model(self, step=None, epoch=None):

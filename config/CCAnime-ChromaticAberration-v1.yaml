@@ -4,7 +4,7 @@ model:
   rev:  "v1.16"
   # Model architecture. 'score' or 'class'
   arch: class
-  # CLIP for openai/clip-vit-large-patch14
+  # CLIP for openai/clip-vit-large-patch14-336
   # META for metaclip_fullcc|ViT-H-14-quickgelu
   clip: CLIP
 
@@ -16,7 +16,7 @@ train:
 
 labels:
   0:
-    name: "No Effect"
+    name: "Pass"
     loss: 1.0
   1:
     name: "Chromatic Aberration"

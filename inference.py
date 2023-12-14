@@ -15,7 +15,7 @@ class CityAestheticsPipeline:
 		Resulting object can be called directly with a PIL image as the input
 		Returns a single float value with the predicted score [0.0;1.0].
 	"""
-	clip_ver = "openai/clip-vit-large-patch14"
+	clip_ver = "openai/clip-vit-large-patch14-336"
 	def __init__(self, model_path, device="cpu", clip_dtype=torch.float32):
 		self.device = device
 		self.clip_dtype = clip_dtype
@@ -90,7 +90,7 @@ class CityClassifierPipeline:
 		Resulting object can be called directly with a PIL image as the input
 		Returns a single float value with the predicted score [0.0;1.0].
 	"""
-	clip_ver = "openai/clip-vit-large-patch14"
+	clip_ver = "openai/clip-vit-large-patch14-336"
 	def __init__(self, model_path, config_path=None, device="cpu", clip_dtype=torch.float32):
 		self.device = device
 		self.clip_dtype = clip_dtype
@@ -134,10 +134,10 @@ class CityClassifierPipeline:
 		return [pred[:, x] for x in range(pred.shape[1])] # split
 
 	def get_clip_emb(self, raw, tiling=False):
-		if tiling and min(raw.size)>512:
+		if tiling and min(raw.size) > self.size*2:
 			if max(raw.size)>1536:
 				raw = TF.functional.resize(raw, 1536)
-			raw = TF.functional.five_crop(raw, 512)
+			raw = TF.functional.five_crop(raw, self.size*2)
 		img = self.proc(
 			images = raw,
 			return_tensors = "pt"
@@ -148,6 +148,7 @@ class CityClassifierPipeline:
 
 	def _init_clip(self):
 		self.proc = CLIPImageProcessor.from_pretrained(self.clip_ver)
+		self.size = self.proc.size.get("shortest_edge", 256)
 		self.clip = CLIPVisionModelWithProjection.from_pretrained(
 			self.clip_ver,
 			device_map  = self.device,
