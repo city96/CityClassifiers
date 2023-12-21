@@ -95,7 +95,7 @@ The eval loss only uses a single image for each target class, hence the question
 ![loss-eval](https://github.com/city96/CityClassifiers/assets/125218114/77c9882f-6263-4926-b3ee-a032ef7784ea)
 
 
-Final dataset score distribution for v1.16:
+Final dataset score distribution for v1.5:
 ```
 22736 images in dataset.
 0_fpl      -  108
