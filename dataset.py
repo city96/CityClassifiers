@@ -154,8 +154,10 @@ class EmbeddingDataset(Dataset):
 	def get_score_eval(self, ext="npy"):
 		shard = self.shard_class(f"{self.root}/test.{ext}", 1.0)
 		data = self.load_shard(shard) if shard.exists() else self[0]
-		data.pop("raw")
-		return {k:v.unsqueeze(0).to(torch.float32) for k,v in data.items()}
+		return {
+			"emb": data.get("emb").unsqueeze(0).to(torch.float32),
+			"val": data.get("val").unsqueeze(0).to(torch.float32),
+		}
 
 ################################
 #    Code for live encoding    #
@@ -201,16 +203,17 @@ class ImageDataset(EmbeddingDataset):
 		assert self.ver in ["CLIP"], "Dataset: META Clip not supported for live encoding!"
 		self.proc, self.clip = self.init_clip()
 
-		self.tfs = self.proc.size.get("shortest_edge", 256)*2
-		self.tf = TF.RandomCrop(self.tfs)
-
 		if self.mode == "score":
+			self.tfs = -1
+			self.tf = None
 			self.parse_shards(
 				vprep  = lambda x: float(x) / 10,
 				exts   = IMAGE_EXTS,
 			)
-			self.eval_data = self.get_score_eval()
+			self.eval_data = self.get_score_eval(ext="png")
 		elif self.mode == "class":
+			self.tfs = self.proc.size.get("shortest_edge", 256)*2
+			self.tf = TF.RandomCrop(self.tfs)
 			self.parse_shards(
 				vprep  = lambda x: int(x),
 				exts   = IMAGE_EXTS,
@@ -226,7 +229,7 @@ class ImageDataset(EmbeddingDataset):
 	def load_shard(self, shard):
 		data = shard.get_data()
 		img = data.pop("img")
-		if min(img.size) >= self.tfs:
+		if self.tf and min(img.size) >= self.tfs:
 			img = self.tf(img) # apply transforms
 		data["emb"] = self.get_clip_emb(img).squeeze(0)
 		return data

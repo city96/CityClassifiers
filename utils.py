@@ -144,7 +144,7 @@ class ModelWrapper:
 			with torch.no_grad():
 				pred = self.model(self.eval_src.to(self.device))
 				loss = self.criterion(pred, self.eval_dst.to(self.device))
-		return loss, pred
+		return loss.item(), pred
 
 	def save_model(self, step=None, epoch=None):
 		step = step or len(self.losses)
