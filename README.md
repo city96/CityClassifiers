@@ -6,7 +6,7 @@ Code for my collection of predictors/classifiers/etc
 
 The base model itself is fairly simple. It takes embeddings from a CLIP model (in this case, `openai/clip-vit-large-patch14-336`) and expands them to 1024 dimensions. From there, a single block with residuals is followed by a few linear layers which converge down to the final output.
 
-For the predictor model, the final output goes through `nn.Tanh`. For the classifier, this is `nn.Softmax` instead.
+For the predictor model, the final output goes through `nn.Tanh` as the training labels are normalized to `[0,1]`. For the classifier, this is `nn.Softmax` instead.
 
 # Classifiers
 

@@ -77,7 +77,8 @@ class EmbeddingDataset(Dataset):
 
 		if self.mode == "score":
 			self.parse_shards(
-				vprep = lambda x: float(x) / 10
+				vprep = lambda x: float(x),
+				norm  = True,
 			)
 			self.eval_data = self.get_score_eval()
 		elif self.mode == "class":
@@ -106,7 +107,7 @@ class EmbeddingDataset(Dataset):
 	def load_shard(self, shard):
 		return shard.get_data()
 
-	def parse_shards(self, vprep, exts=ALLOWED_EXTS):
+	def parse_shards(self, vprep, exts=ALLOWED_EXTS, norm=False):
 		print("Dataset: Parsing data from disk")
 		self.shards = []
 		for cat in tqdm(os.listdir(self.root)):
@@ -121,6 +122,12 @@ class EmbeddingDataset(Dataset):
 						value = vprep(cat.split('_', 1)[0]),
 					)
 				)
+		if norm:
+			shard_min = min([x.value for x in self.shards])
+			shard_max = max([x.value for x in self.shards])
+			print(f"Normalizing scores [{shard_min}, {shard_max}]")
+			for s in self.shards:
+				s.value = (s.value - shard_min) / (shard_max - shard_min)
 
 	def parse_labels(self):
 		assert self.mode == "class"
@@ -207,8 +214,9 @@ class ImageDataset(EmbeddingDataset):
 			self.tfs = -1
 			self.tf = None
 			self.parse_shards(
-				vprep  = lambda x: float(x) / 10,
+				vprep  = lambda x: float(x),
 				exts   = IMAGE_EXTS,
+				norm   = True,
 			)
 			self.eval_data = self.get_score_eval(ext="png")
 		elif self.mode == "class":
