@@ -155,7 +155,7 @@ This model focuses on as few false positives as possible. Only having one type o
 #### Out-of-scope
 
 - This model is not meant for moderation/live filtering/etc
-- The demo code is not meant to work with large-scale datasets and is therefore only single-threaded. If you're working on something that requires an optimized version that can work on pre-computed CLIP embeddings for faster iteration, feel free to [contact me](mailto:city@eruruu.net).
+- The demo code is not meant to work with large-scale datasets and is therefore only single-threaded. If you're working on something that requires an optimized version that can work on pre-computed CLIP embeddings for faster iteration, feel free to [contact me](https://v100s.net).
 
 ### Usecases
 
